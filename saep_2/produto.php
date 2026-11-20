@@ -1,5 +1,7 @@
 <?php
 session_start();
+require_once __DIR__ . '/auth.php';
+exigir_login();
 require_once __DIR__ . '/conexao.php';
 
 $st = $pdo->prepare("SELECT * FROM produto WHERE id_produto = :id");

@@ -1,11 +1,14 @@
 <?php
 session_start();
+require_once __DIR__ . '/auth.php';
+exigir_login();
 require_once __DIR__ . '/conexao.php';
 
 $sucesso = "";
 $erro = "";
 
 if (isset($_GET["excluir"])) {
+    exigir_admin();
     try {
         $st = $pdo->prepare("DELETE FROM produto WHERE id_produto = ?");
         $st->execute([$_GET["excluir"]]);
@@ -24,12 +27,21 @@ if (isset($_GET["excluir"])) {
     }
 }
 if (isset($_GET["salvo"])) {
-    $sucesso = "Produto cadastrado com sucesso!";
+    $sucesso = "Produto salvo com sucesso!";
 }
 
 require_once __DIR__ . '/includes/menu.php';
 
-$produtos = $pdo->query("SELECT * FROM produto ORDER BY nome")->fetchAll();
+$nomeBusca = trim($_GET["nome"] ?? "");
+$dataBusca = trim($_GET["data"] ?? "");
+$sql = "SELECT * FROM produto WHERE 1=1";
+$parametros = [];
+if ($nomeBusca !== "") { $sql .= " AND nome LIKE ?"; $parametros[] = "%" . $nomeBusca . "%"; }
+if ($dataBusca !== "") { $sql .= " AND data_cadastro = ?"; $parametros[] = $dataBusca; }
+$sql .= " ORDER BY nome";
+$st = $pdo->prepare($sql);
+$st->execute($parametros);
+$produtos = $st->fetchAll();
 ?>
     <main class="flex-1 flex flex-col">
 
@@ -61,6 +73,12 @@ $produtos = $pdo->query("SELECT * FROM produto ORDER BY nome")->fetchAll();
                 </div>
             <?php endif; ?>
 
+            <form method="get" class="bg-white rounded-xl shadow-sm p-4 mb-4 flex flex-wrap gap-3 items-end">
+                <div><label class="form-label">Nome</label><input class="form-input" name="nome" value="<?= htmlspecialchars($nomeBusca) ?>" placeholder="Buscar produto"></div>
+                <div><label class="form-label">Data de cadastro</label><input class="form-input" type="date" name="data" value="<?= htmlspecialchars($dataBusca) ?>"></div>
+                <button class="bg-senai-blue text-white px-4 py-2 rounded-lg text-sm">Filtrar</button>
+                <a href="produtos.php" class="text-sm text-gray-500 px-2 py-2">Limpar</a>
+            </form>
             <div class="bg-white rounded-xl shadow-sm overflow-hidden">
                 <table class="w-full text-sm">
                     <thead class="bg-senai-blue text-white">
@@ -83,9 +101,12 @@ $produtos = $pdo->query("SELECT * FROM produto ORDER BY nome")->fetchAll();
                             <td class="px-4 py-3 text-center text-gray-600 font-semibold">R$ <?= number_format($valorTotal, 2, ",", ".") ?></td>
                             <td class="px-4 py-3 text-center">
                                 <div class="flex items-center justify-center gap-1.5">
+                                    <a href="produto_form.php?id=<?= $p["id_produto"] ?>" class="bg-yellow-600 text-white text-xs px-2.5 py-1.5 rounded-md">Editar</a>
                                     <a href="produto.php?id=<?= $p["id_produto"] ?>" class="bg-senai-blue text-white text-xs px-2.5 py-1.5 rounded-md hover:bg-senai-blue-dark transition" title="Ver produto">🔍 Ver</a>
                                     <a href="movimentacao_form.php?id_produto=<?= $p["id_produto"] ?>" class="bg-yellow-500 text-white text-xs px-2.5 py-1.5 rounded-md hover:bg-yellow-600 transition" title="Movimentar estoque">🔄 Movimentar</a>
+                                    <?php if (eh_admin()): ?>
                                     <a onclick="return confirm('Tem certeza disso?')" class="bg-senai-red text-white text-xs px-2.5 py-1.5 rounded-md hover:bg-red-700 transition" href="?excluir=<?= $p["id_produto"] ?>">Excluir</a>
+                                    <?php endif; ?>
                                 </div>
                             </td>
                         </tr>

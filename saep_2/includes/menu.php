@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/../auth.php';
+exigir_login();
 $pagina = basename($_SERVER['PHP_SELF']);
 $ativo = function ($prefixo) use ($pagina) {
     return strpos($pagina, $prefixo) === 0 ? 'active' : '';
@@ -36,5 +38,13 @@ $ativo = function ($prefixo) use ($pagina) {
             <a href="estoque.php"       class="nav-link <?= $ativo('estoque') ?>">📋 Verificar Estoque</a>
             <a href="movimentacoes.php" class="nav-link <?= $ativo('movimentac') ?>">🔄 Movimentações</a>
             <a href="saidas.php"        class="nav-link <?= $ativo('saidas') ?>">📤 Saídas</a>
+            <?php if (eh_admin()): ?>
+            <a href="usuarios.php" class="nav-link <?= $ativo('usuario') ?>">👥 Usuários</a>
+            <?php endif; ?>
         </nav>
+        <div class="p-3 border-t border-gray-700 text-xs text-gray-300">
+            <p class="font-semibold"><?= htmlspecialchars($_SESSION['nome']) ?></p>
+            <p class="text-gray-500 mb-3"><?= htmlspecialchars($_SESSION['perfil']) ?></p>
+            <a href="sair.php" class="nav-link">Sair</a>
+        </div>
     </aside>

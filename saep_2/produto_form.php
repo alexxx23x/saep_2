@@ -1,5 +1,7 @@
 <?php
 session_start();
+require_once __DIR__ . '/auth.php';
+exigir_login();
 require_once __DIR__ . '/conexao.php';
 
 $erro = "";
@@ -8,6 +10,17 @@ $nome       = "";
 $quantidade = "";
 $valor      = "";
 $data       = date("Y-m-d");
+$id_edicao = (int) ($_GET["id"] ?? 0);
+if ($id_edicao > 0) {
+    $st = $pdo->prepare("SELECT * FROM produto WHERE id_produto = ?");
+    $st->execute([$id_edicao]);
+    $registro = $st->fetch();
+    if (!$registro) { exit("Produto não encontrado."); }
+    $nome = $registro["nome"];
+    $quantidade = $registro["quantidade_estoque"];
+    $valor = $registro["valor_unitario"];
+    $data = $registro["data_cadastro"];
+}
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
@@ -21,16 +34,21 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     } elseif ((int) $quantidade < 0 || (float) $valor < 0) {
         $erro = "Quantidade e valor não podem ser negativos.";
     } else {
-        $st = $pdo->prepare("SELECT id_produto FROM produto WHERE nome = ?");
-        $st->execute([$nome]);
+        $st = $pdo->prepare("SELECT id_produto FROM produto WHERE nome = ? AND id_produto <> ?");
+        $st->execute([$nome, $id_edicao]);
         if ($st->fetch()) {
             $erro = "Produto já cadastrado!";
         }
     }
 
     if ($erro === "") {
-        $st = $pdo->prepare("INSERT INTO produto (nome, quantidade_estoque, valor_unitario, data_cadastro) VALUES (?, ?, ?, ?)");
-        $st->execute([$nome, (int) $quantidade, (float) $valor, $data]);
+        if ($id_edicao > 0) {
+            $st = $pdo->prepare("UPDATE produto SET nome = ?, quantidade_estoque = ?, valor_unitario = ?, data_cadastro = ? WHERE id_produto = ?");
+            $st->execute([$nome, (int) $quantidade, (float) $valor, $data, $id_edicao]);
+        } else {
+            $st = $pdo->prepare("INSERT INTO produto (nome, quantidade_estoque, valor_unitario, data_cadastro) VALUES (?, ?, ?, ?)");
+            $st->execute([$nome, (int) $quantidade, (float) $valor, $data]);
+        }
 
         header("Location: produtos.php?salvo=1");     // redireciona após gravar
         exit;
@@ -43,9 +61,9 @@ require_once __DIR__ . '/includes/menu.php';
         <div class="bg-white border-b border-gray-200 px-6 py-4">
             <div class="flex items-center gap-2 text-xs text-gray-400 mb-1">
                 <a href="produtos.php" class="hover:text-senai-blue">Produtos</a> ›
-                <span class="text-gray-700 font-semibold">Novo Produto</span>
+                <span class="text-gray-700 font-semibold"><?= $id_edicao > 0 ? "Editar Produto" : "Novo Produto" ?></span>
             </div>
-            <h1 class="text-xl font-extrabold text-gray-800">Novo Produto</h1>
+            <h1 class="text-xl font-extrabold text-gray-800"><?= $id_edicao > 0 ? "Editar Produto" : "Novo Produto" ?></h1>
         </div>
         <div class="p-6 flex-1 max-w-xl">
 

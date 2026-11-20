@@ -1,17 +1,39 @@
 <?php
 session_start();
+require_once __DIR__ . '/auth.php';
+exigir_login();
 require_once __DIR__ . '/conexao.php';
 
 $sucesso = "";
 $erro = "";
 
 if (isset($_GET["excluir"])) {
-    $st = $pdo->prepare("DELETE FROM movimentacao WHERE id_movimentacao = ?");
-    $st->execute([$_GET["excluir"]]);
-    if ($st->rowCount() > 0) {
-        $sucesso = "Movimentação removida com sucesso!";
-    } else {
-        $erro = "Não foi possível encontrar a movimentação!";
+    exigir_admin();
+    $id = (int) $_GET["excluir"];
+    $pdo->beginTransaction();
+    try {
+        $st = $pdo->prepare("SELECT * FROM movimentacao WHERE id_movimentacao = ? FOR UPDATE");
+        $st->execute([$id]);
+        $mov = $st->fetch();
+        if ($mov) {
+            $delta = $mov["tipo"] === "ENTRADA" ? -(int) $mov["quantidade"] : (int) $mov["quantidade"];
+            $st = $pdo->prepare("SELECT quantidade_estoque FROM produto WHERE id_produto = ? FOR UPDATE");
+            $st->execute([$mov["id_produto"]]);
+            $saldo = $st->fetchColumn();
+            if ($saldo + $delta < 0) {
+                $erro = "Não é possível excluir: o saldo atual não permite desfazer esta movimentação.";
+            } else {
+                $st = $pdo->prepare("UPDATE produto SET quantidade_estoque = quantidade_estoque + ? WHERE id_produto = ?");
+                $st->execute([$delta, $mov["id_produto"]]);
+                $st = $pdo->prepare("DELETE FROM movimentacao WHERE id_movimentacao = ?");
+                $st->execute([$id]);
+                $sucesso = "Movimentação removida e estoque ajustado.";
+            }
+        } else { $erro = "Movimentação não encontrada."; }
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $e;
     }
 }
 if (isset($_GET["salvo"])) {
@@ -90,7 +112,9 @@ $movimentacoes = $pdo->query($sql)->fetchAll();
                             <td class="px-4 py-3 text-center text-gray-600"><?= htmlspecialchars($m["usuario"] ?? "-") ?></td>
                             <td class="px-4 py-3 text-center">
                                 <div class="flex items-center justify-center gap-1.5">
+                                    <?php if (eh_admin()): ?>
                                     <a onclick="return confirm('Tem certeza disso?')" class="bg-senai-red text-white text-xs px-2.5 py-1.5 rounded-md hover:bg-red-700 transition" href="?excluir=<?= $m["id_movimentacao"] ?>">Excluir</a>
+                                    <?php endif; ?>
                                 </div>
                             </td>
                         </tr>
